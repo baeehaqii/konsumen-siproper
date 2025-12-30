@@ -8,26 +8,26 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" })
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
-  generator: "v0.app",
+  title: "Customer Siproepr",
+  description: "Lacak Progres Pembelian Hunian di Sapphire Grup",
   icons: {
     icon: [
       {
-        url: "/icon-light-32x32.png",
+        url: "https://res.cloudinary.com/dx8w9qwl6/image/upload/v1767072165/logooo_kdnfbc.png",
         media: "(prefers-color-scheme: light)",
       },
       {
-        url: "/icon-dark-32x32.png",
+        url: "https://res.cloudinary.com/dx8w9qwl6/image/upload/v1767072165/logooo_kdnfbc.png",
         media: "(prefers-color-scheme: dark)",
       },
       {
-        url: "/icon.svg",
+        url: "https://res.cloudinary.com/dx8w9qwl6/image/upload/v1767072165/logooo_kdnfbc.png",
         type: "image/svg+xml",
       },
     ],
-    apple: "/apple-icon.png",
+    apple: "https://res.cloudinary.com/dx8w9qwl6/image/upload/v1767072165/logooo_kdnfbc.png",
   },
+    generator: 'v0.app'
 }
 
 export default function RootLayout({
