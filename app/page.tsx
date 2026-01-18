@@ -2,26 +2,33 @@
 
 import { useState } from "react"
 import GradientBlinds from "@/components/GradientBlinds"
-import Navbar from "@/components/Navbar"
 import NIKModal from "@/components/nik-modal"
+import ComplaintModal from "@/components/complaint-modal"
 import Notification from "@/components/notification"
 
 export default function Home() {
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isNIKModalOpen, setIsNIKModalOpen] = useState(false)
+  const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false)
   const [showNotification, setShowNotification] = useState(false)
+  const [notificationMessage, setNotificationMessage] = useState("")
   const [foundNIK, setFoundNIK] = useState("")
 
   const handleNIKSubmit = (nik: string) => {
     if (nik.length === 16 && /^\d+$/.test(nik)) {
       setFoundNIK(nik)
+      setNotificationMessage("NIK ditemukan!")
       setShowNotification(true)
     }
   }
 
+  const handleComplaintSubmit = () => {
+    setFoundNIK("")
+    setNotificationMessage("Komplain berhasil dikirim!")
+    setShowNotification(true)
+  }
+
   return (
     <main className="relative min-h-screen overflow-hidden">
-      <Navbar />
-
       {/* Animated Gradient Background */}
       <div className="fixed inset-0 w-full h-full flex items-center justify-center">
         <GradientBlinds
@@ -55,12 +62,21 @@ export default function Home() {
 
               <div className="flex flex-col sm:flex-row gap-4 mt-4">
                 <button
-                  onClick={() => setIsModalOpen(true)}
+                  onClick={() => setIsNIKModalOpen(true)}
                   className="inline-flex items-center justify-center rounded-full border-2 border-white/30 bg-white/10 px-8 py-4 text-lg font-semibold text-white backdrop-blur transition-all hover:bg-white/20 hover:border-white/50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-transparent shadow-xl"
                 >
                   Lacak Rumah
                   <svg className="ml-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setIsComplaintModalOpen(true)}
+                  className="inline-flex items-center justify-center rounded-full border-2 border-red-400/50 bg-red-600/80 px-8 py-4 text-lg font-semibold text-white backdrop-blur transition-all hover:bg-red-600 hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-transparent shadow-xl"
+                >
+                  Komplain
+                  <svg className="ml-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                 </button>
               </div>
@@ -69,10 +85,16 @@ export default function Home() {
         </div>
       </div>
 
-      <NIKModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onNIKSubmit={handleNIKSubmit} />
+      <NIKModal isOpen={isNIKModalOpen} onClose={() => setIsNIKModalOpen(false)} onNIKSubmit={handleNIKSubmit} />
+
+      <ComplaintModal
+        isOpen={isComplaintModalOpen}
+        onClose={() => setIsComplaintModalOpen(false)}
+        onSubmit={handleComplaintSubmit}
+      />
 
       <Notification
-        message="NIK ditemukan!"
+        message={notificationMessage}
         nik={foundNIK}
         isVisible={showNotification}
         onClose={() => setShowNotification(false)}
