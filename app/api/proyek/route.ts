@@ -59,6 +59,13 @@ async function getAccessToken(): Promise<string> {
 export async function GET() {
   try {
     console.log("🚀 Starting GET /api/proyek request")
+    
+    // Check environment variables
+    console.log("🔍 Environment check:")
+    console.log("  SIPROPER_API_URL:", process.env.SIPROPER_API_URL ? "✓ Set" : "✗ Missing")
+    console.log("  SIPROPER_EMAIL:", process.env.SIPROPER_EMAIL ? "✓ Set" : "✗ Missing") 
+    console.log("  SIPROPER_PASSWORD:", process.env.SIPROPER_PASSWORD ? "✓ Set" : "✗ Missing")
+    
     const token = await getAccessToken()
     const baseUrl = process.env.SIPROPER_API_URL
 

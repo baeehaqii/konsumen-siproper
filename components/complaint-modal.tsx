@@ -50,18 +50,32 @@ export default function ComplaintModal({ isOpen, onClose, onSubmit }: ComplaintM
   const fetchProyek = async () => {
     setIsLoadingProyek(true)
     try {
+      console.log("🚀 Fetching proyek from /api/proyek...")
       const response = await fetch("/api/proyek")
+      console.log("📡 Response status:", response.status, response.statusText)
+      
       const data = await response.json()
+      console.log("📥 Response data:", data)
+      console.log("📊 Data type:", typeof data)
+      console.log("📊 Data.data:", data.data)
+      console.log("📊 Is data.data array:", Array.isArray(data.data))
 
       if (data.status === "success" && data.data) {
+        console.log("✅ Setting proyek options from data.data:", data.data.length)
         setProyekOptions(data.data)
       } else if (Array.isArray(data.data)) {
+        console.log("✅ Setting proyek options from array data.data:", data.data.length)
         setProyekOptions(data.data)
       } else if (Array.isArray(data)) {
+        console.log("✅ Setting proyek options from direct array:", data.length)
         setProyekOptions(data)
+      } else {
+        console.log("⚠️ Unexpected data format, setting empty array")
+        setProyekOptions([])
       }
     } catch (error) {
-      console.error("Error fetching proyek:", error)
+      console.error("❌ Error fetching proyek:", error)
+      setProyekOptions([])
     } finally {
       setIsLoadingProyek(false)
     }
