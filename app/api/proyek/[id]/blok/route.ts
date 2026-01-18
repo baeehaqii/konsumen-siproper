@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server"
 
-// Cache for access token
+// Cache for access token (shared with proyek route)
 let cachedToken: string | null = null
 let tokenExpiry: number = 0
 
@@ -18,8 +18,6 @@ async function getAccessToken(): Promise<string> {
   const password = process.env.SIPROPER_PASSWORD
 
   console.log("🔐 Attempting to login to:", baseUrl)
-  console.log("📧 Email:", email ? "✓ Set" : "✗ Missing")
-  console.log("🔑 Password:", password ? "✓ Set" : "✗ Missing")
 
   if (!baseUrl || !email || !password) {
     throw new Error("Missing API credentials in environment variables")
@@ -40,7 +38,6 @@ async function getAccessToken(): Promise<string> {
   }
 
   const data = await response.json()
-  console.log("📥 Login response:", JSON.stringify(data, null, 2))
 
   if (data.status !== "success") {
     console.error("❌ Login unsuccessful:", data.message)
@@ -56,14 +53,18 @@ async function getAccessToken(): Promise<string> {
   return cachedToken as string
 }
 
-export async function GET() {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    console.log("🚀 Starting GET /api/proyek request")
+    const { id } = await params
+    console.log("🚀 Starting GET /api/proyek/[id]/blok request for proyek ID:", id)
     const token = await getAccessToken()
     const baseUrl = process.env.SIPROPER_API_URL
 
-    console.log("📡 Fetching proyek from:", `${baseUrl}/api/proyek`)
-    const response = await fetch(`${baseUrl}/api/proyek`, {
+    console.log("📡 Fetching blok from:", `${baseUrl}/api/proyek/${id}/blok`)
+    const response = await fetch(`${baseUrl}/api/proyek/${id}/blok`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -73,7 +74,7 @@ export async function GET() {
     })
 
     if (!response.ok) {
-      console.error("❌ Proyek fetch failed:", response.status, response.statusText)
+      console.error("❌ Blok fetch failed:", response.status, response.statusText)
       
       // If unauthorized, try to refresh token
       if (response.status === 401) {
@@ -82,7 +83,7 @@ export async function GET() {
         tokenExpiry = 0
         const newToken = await getAccessToken()
         
-        const retryResponse = await fetch(`${baseUrl}/api/proyek`, {
+        const retryResponse = await fetch(`${baseUrl}/api/proyek/${id}/blok`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -93,23 +94,55 @@ export async function GET() {
 
         if (!retryResponse.ok) {
           console.error("❌ Retry failed:", retryResponse.status, retryResponse.statusText)
-          throw new Error(`Failed to fetch proyek: ${retryResponse.statusText}`)
+          throw new Error(`Failed to fetch blok: ${retryResponse.statusText}`)
         }
 
         const retryData = await retryResponse.json()
-        console.log("✅ Retry successful! Data:", JSON.stringify(retryData, null, 2))
-        return NextResponse.json(retryData)
+        console.log("✅ Retry successful! Blok data:", JSON.stringify(retryData, null, 2))
+        
+        const retryBlokArray = retryData.blok || []
+        
+        if (!retryBlokArray || retryBlokArray.length === 0) {
+          return NextResponse.json(
+            { status: "error", message: "Proyek belum memiliki blok" },
+            { status: 404 }
+          )
+        }
+        
+        return NextResponse.json({
+          status: "success",
+          data: retryBlokArray
+        })
       }
 
-      throw new Error(`Failed to fetch proyek: ${response.statusText}`)
+      throw new Error(`Failed to fetch blok: ${response.statusText}`)
     }
 
     const data = await response.json()
-    console.log("✅ Proyek fetched successfully!")
-    console.log("📊 Data:", JSON.stringify(data, null, 2))
-    return NextResponse.json(data)
+    console.log("✅ Blok fetched successfully!")
+    console.log("📊 Full Response:", JSON.stringify(data, null, 2))
+    
+    // Extract blok array from response
+    const blokArray = data.blok || []
+    console.log("📊 Blok array:", blokArray)
+    console.log("📊 Blok count:", blokArray.length)
+    
+    // Check if proyek has blok
+    if (!blokArray || blokArray.length === 0) {
+      console.log("⚠️ Proyek tidak memiliki blok")
+      return NextResponse.json(
+        { status: "error", message: "Proyek belum memiliki blok" },
+        { status: 404 }
+      )
+    }
+
+    console.log("✅ Returning", blokArray.length, "blok to frontend")
+    return NextResponse.json({
+      status: "success",
+      data: blokArray
+    })
   } catch (error) {
-    console.error("Error fetching proyek:", error)
+    console.error("Error fetching blok:", error)
     return NextResponse.json(
       { status: "error", message: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }

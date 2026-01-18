@@ -16,7 +16,11 @@ interface Proyek {
   [key: string]: unknown
 }
 
-const blokOptions = ["Blok A-1", "Blok A-2", "Blok A-3"]
+interface Blok {
+  id: string
+  nama_blok: string
+  [key: string]: unknown
+}
 
 export default function ComplaintModal({ isOpen, onClose, onSubmit }: ComplaintModalProps) {
   const [formData, setFormData] = useState({
@@ -33,6 +37,9 @@ export default function ComplaintModal({ isOpen, onClose, onSubmit }: ComplaintM
   const [isLoading, setIsLoading] = useState(false)
   const [proyekOptions, setProyekOptions] = useState<Proyek[]>([])
   const [isLoadingProyek, setIsLoadingProyek] = useState(false)
+  const [blokOptions, setBlokOptions] = useState<Blok[]>([])
+  const [isLoadingBlok, setIsLoadingBlok] = useState(false)
+  const [blokError, setBlokError] = useState("")
 
   useEffect(() => {
     if (isOpen) {
@@ -45,7 +52,7 @@ export default function ComplaintModal({ isOpen, onClose, onSubmit }: ComplaintM
     try {
       const response = await fetch("/api/proyek")
       const data = await response.json()
-      
+
       if (data.status === "success" && data.data) {
         setProyekOptions(data.data)
       } else if (Array.isArray(data.data)) {
@@ -60,6 +67,57 @@ export default function ComplaintModal({ isOpen, onClose, onSubmit }: ComplaintM
     }
   }
 
+  const fetchBlok = async (proyekId: string) => {
+    if (!proyekId) {
+      setBlokOptions([])
+      setBlokError("")
+      return
+    }
+
+    setIsLoadingBlok(true)
+    setBlokError("")
+    setBlokOptions([])
+
+    try {
+      console.log("🔍 Fetching blok for proyek:", proyekId)
+      const response = await fetch(`/api/proyek/${proyekId}/blok`)
+      const data = await response.json()
+
+      if (data.status === "error") {
+        console.log("⚠️ Error from API:", data.message)
+        setBlokError(data.message || "Proyek belum memiliki blok")
+        setBlokOptions([])
+      } else if (data.status === "success" && data.data) {
+        console.log("✅ Blok loaded:", data.data.length, "blok")
+        // show a small sample for debugging
+        console.log("🔎 Sample blok items:", data.data.slice(0, 5))
+        setBlokOptions(data.data)
+        setBlokError("")
+      } else if (Array.isArray(data.data)) {
+        setBlokOptions(data.data)
+        setBlokError("")
+      } else if (Array.isArray(data)) {
+        setBlokOptions(data)
+        setBlokError("")
+      } else {
+        console.log("⚠️ Unexpected data format")
+        setBlokError("Format data tidak sesuai")
+      }
+    } catch (error) {
+      console.error("❌ Error fetching blok:", error)
+      setBlokError("Gagal memuat blok")
+      setBlokOptions([])
+    } finally {
+      setIsLoadingBlok(false)
+    }
+  }
+
+  const handleProyekChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const proyekId = e.target.value
+    setFormData({ ...formData, proyek: proyekId, blok: "" })
+    fetchBlok(proyekId)
+  }
+
   const handleCheckboxChange = (value: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -72,22 +130,81 @@ export default function ComplaintModal({ isOpen, onClose, onSubmit }: ComplaintM
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsLoading(false)
-    onSubmit()
-    setFormData({
-      proyek: "",
-      blok: "",
-      namaKonsumen: "",
-      noWhatsApp: "",
-      tanggalKomplain: "",
-      tanggalBAST: "",
-      deskripsi: "",
-      jenisKomplain: [],
-      clusterKomplain: "",
-    })
-    onClose()
+
+    try {
+      console.log("📤 Submitting komplain:", formData)
+
+      const response = await fetch("/api/komplain", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          proyek_id: formData.proyek,
+          blok_id: formData.blok,
+          nama_konsumen: formData.namaKonsumen,
+          no_whatsapp: formData.noWhatsApp,
+          tanggal_komplain: formData.tanggalKomplain,
+          tanggal_bast: formData.tanggalBAST,
+          deskripsi: formData.deskripsi,
+          jenis_komplain: formData.jenisKomplain,
+          cluster_komplain: formData.clusterKomplain,
+        }),
+      })
+
+      const data = await response.json()
+      console.log("📥 Komplain response status:", response.status)
+      console.log("📥 Komplain response:", data)
+
+      if (!response.ok || data.status === "error") {
+        const errorMessage = data.message || `Gagal mengirim komplain (${response.status})`
+        console.error("❌ Submit failed:", errorMessage)
+        throw new Error(errorMessage)
+      }
+
+      console.log("✅ Komplain berhasil dikirim!")
+
+      // Extract complaint number from response
+      const nomorKomplain = data.data?.nomor_komplain || data.nomor_komplain
+      console.log("📋 Nomor komplain:", nomorKomplain)
+
+      // Store customer name before resetting form
+      const namaKonsumen = formData.namaKonsumen
+
+      // Reset form
+      setFormData({
+        proyek: "",
+        blok: "",
+        namaKonsumen: "",
+        noWhatsApp: "",
+        tanggalKomplain: "",
+        tanggalBAST: "",
+        deskripsi: "",
+        jenisKomplain: [],
+        clusterKomplain: "",
+      })
+
+      // Close modal first
+      onClose()
+
+      // Redirect to success page with complaint number and customer name
+      const params = new URLSearchParams()
+      if (nomorKomplain) {
+        params.append('nomor_komplain', nomorKomplain)
+      }
+      if (namaKonsumen) {
+        params.append('nama_konsumen', namaKonsumen)
+      }
+
+      window.location.href = `/komplain/sukses?${params.toString()}`
+
+      onSubmit()
+    } catch (error) {
+      console.error("❌ Error submitting komplain:", error)
+      alert(error instanceof Error ? error.message : "Terjadi kesalahan saat mengirim komplain")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   if (!isOpen) return null
@@ -114,7 +231,7 @@ export default function ComplaintModal({ isOpen, onClose, onSubmit }: ComplaintM
                 <label className="block text-sm font-medium text-gray-700 mb-2">Proyek</label>
                 <select
                   value={formData.proyek}
-                  onChange={(e) => setFormData({ ...formData, proyek: e.target.value })}
+                  onChange={handleProyekChange}
                   className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 appearance-none bg-white"
                   required
                   disabled={isLoadingProyek}
@@ -132,16 +249,36 @@ export default function ComplaintModal({ isOpen, onClose, onSubmit }: ComplaintM
                 <select
                   value={formData.blok}
                   onChange={(e) => setFormData({ ...formData, blok: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 appearance-none bg-white"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 appearance-none bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   required
+                  disabled={!formData.proyek || isLoadingBlok || blokOptions.length === 0}
                 >
-                  <option value="">Pilih Blok</option>
-                  {blokOptions.map((blok) => (
-                    <option key={blok} value={blok}>
-                      {blok}
-                    </option>
-                  ))}
+                  <option value="">
+                    {!formData.proyek
+                      ? "Pilih proyek terlebih dahulu"
+                      : isLoadingBlok
+                        ? "Memuat blok..."
+                        : blokError
+                          ? blokError
+                          : blokOptions.length === 0
+                            ? "Tidak ada blok tersedia"
+                            : "Pilih Blok"}
+                  </option>
+                  {blokOptions.map((blok: any, index: number) => {
+                    // Prefer fields that contain proper blok identifiers
+                    const label = blok?.nama_blok ?? blok?.nama ?? blok?.kode_blok ?? blok?.kode ?? blok?.blok ?? (typeof blok === 'string' ? blok : undefined) ?? `Blok ${index + 1}`
+                    const value = blok?.id ?? blok?.kode_blok ?? blok?.blok ?? blok?.nama_blok ?? label
+                    const key = blok?.id ?? `${value}-${index}`
+                    return (
+                      <option key={key} value={value}>
+                        {label}
+                      </option>
+                    )
+                  })}
                 </select>
+                {blokError && (
+                  <p className="mt-1 text-sm text-red-600">{blokError}</p>
+                )}
               </div>
             </div>
 

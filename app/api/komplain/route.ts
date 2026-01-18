@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server"
 
-// Cache for access token
+// Cache for access token (shared with proyek route)
 let cachedToken: string | null = null
 let tokenExpiry: number = 0
 
@@ -18,8 +18,6 @@ async function getAccessToken(): Promise<string> {
   const password = process.env.SIPROPER_PASSWORD
 
   console.log("🔐 Attempting to login to:", baseUrl)
-  console.log("📧 Email:", email ? "✓ Set" : "✗ Missing")
-  console.log("🔑 Password:", password ? "✓ Set" : "✗ Missing")
 
   if (!baseUrl || !email || !password) {
     throw new Error("Missing API credentials in environment variables")
@@ -40,7 +38,6 @@ async function getAccessToken(): Promise<string> {
   }
 
   const data = await response.json()
-  console.log("📥 Login response:", JSON.stringify(data, null, 2))
 
   if (data.status !== "success") {
     console.error("❌ Login unsuccessful:", data.message)
@@ -56,24 +53,40 @@ async function getAccessToken(): Promise<string> {
   return cachedToken as string
 }
 
-export async function GET() {
+export async function POST(request: Request) {
   try {
-    console.log("🚀 Starting GET /api/proyek request")
+    console.log("🚀 Starting POST /api/komplain request")
+    
+    const body = await request.json()
+    console.log("📤 Komplain data:", JSON.stringify(body, null, 2))
+    
     const token = await getAccessToken()
     const baseUrl = process.env.SIPROPER_API_URL
 
-    console.log("📡 Fetching proyek from:", `${baseUrl}/api/proyek`)
-    const response = await fetch(`${baseUrl}/api/proyek`, {
-      method: "GET",
+    console.log("📡 Sending komplain to:", `${baseUrl}/api/komplain-baru`)
+    const response = await fetch(`${baseUrl}/api/komplain-baru`, {
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
         "Authorization": `Bearer ${token}`,
       },
+      body: JSON.stringify(body),
     })
 
     if (!response.ok) {
-      console.error("❌ Proyek fetch failed:", response.status, response.statusText)
+      console.error("❌ Komplain submission failed:", response.status, response.statusText)
+      
+      // Try to get error message from response
+      const errorText = await response.text()
+      console.error("❌ Error response body:", errorText)
+      
+      let errorData
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { message: errorText || response.statusText }
+      }
       
       // If unauthorized, try to refresh token
       if (response.status === 401) {
@@ -82,34 +95,46 @@ export async function GET() {
         tokenExpiry = 0
         const newToken = await getAccessToken()
         
-        const retryResponse = await fetch(`${baseUrl}/api/proyek`, {
-          method: "GET",
+        const retryResponse = await fetch(`${baseUrl}/api/komplain-baru`, {
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Accept": "application/json",
             "Authorization": `Bearer ${newToken}`,
           },
+          body: JSON.stringify(body),
         })
 
         if (!retryResponse.ok) {
           console.error("❌ Retry failed:", retryResponse.status, retryResponse.statusText)
-          throw new Error(`Failed to fetch proyek: ${retryResponse.statusText}`)
+          const retryErrorText = await retryResponse.text()
+          console.error("❌ Retry error body:", retryErrorText)
+          
+          let retryErrorData
+          try {
+            retryErrorData = JSON.parse(retryErrorText)
+          } catch {
+            retryErrorData = { message: retryErrorText || retryResponse.statusText }
+          }
+          
+          throw new Error(retryErrorData.message || `Failed to submit komplain: ${retryResponse.statusText}`)
         }
 
         const retryData = await retryResponse.json()
-        console.log("✅ Retry successful! Data:", JSON.stringify(retryData, null, 2))
+        console.log("✅ Retry successful! Response:", JSON.stringify(retryData, null, 2))
         return NextResponse.json(retryData)
       }
 
-      throw new Error(`Failed to fetch proyek: ${response.statusText}`)
+      // Return error from first attempt
+      throw new Error(errorData.message || `Failed to submit komplain: ${response.statusText}`)
     }
 
     const data = await response.json()
-    console.log("✅ Proyek fetched successfully!")
-    console.log("📊 Data:", JSON.stringify(data, null, 2))
+    console.log("✅ Komplain submitted successfully!")
+    console.log("📊 Response:", JSON.stringify(data, null, 2))
     return NextResponse.json(data)
   } catch (error) {
-    console.error("Error fetching proyek:", error)
+    console.error("❌ Error submitting komplain:", error)
     return NextResponse.json(
       { status: "error", message: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
