@@ -53,7 +53,7 @@ export default function ComplaintModal({ isOpen, onClose, onSubmit }: ComplaintM
       console.log("🚀 Fetching proyek from /api/proyek...")
       const response = await fetch("/api/proyek")
       console.log("📡 Response status:", response.status, response.statusText)
-      
+
       const data = await response.json()
       console.log("📥 Response data:", data)
       console.log("📊 Data type:", typeof data)

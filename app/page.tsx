@@ -10,20 +10,8 @@ export default function Home() {
   const [isNIKModalOpen, setIsNIKModalOpen] = useState(false)
   const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false)
   const [showNotification, setShowNotification] = useState(false)
-  const [notificationMessage, setNotificationMessage] = useState("")
-  const [foundNIK, setFoundNIK] = useState("")
-
-  const handleNIKSubmit = (nik: string) => {
-    if (nik.length === 16 && /^\d+$/.test(nik)) {
-      setFoundNIK(nik)
-      setNotificationMessage("NIK ditemukan!")
-      setShowNotification(true)
-    }
-  }
 
   const handleComplaintSubmit = () => {
-    setFoundNIK("")
-    setNotificationMessage("Komplain berhasil dikirim!")
     setShowNotification(true)
   }
 
@@ -85,7 +73,7 @@ export default function Home() {
         </div>
       </div>
 
-      <NIKModal isOpen={isNIKModalOpen} onClose={() => setIsNIKModalOpen(false)} onNIKSubmit={handleNIKSubmit} />
+      <NIKModal isOpen={isNIKModalOpen} onClose={() => setIsNIKModalOpen(false)} />
 
       <ComplaintModal
         isOpen={isComplaintModalOpen}
@@ -94,8 +82,8 @@ export default function Home() {
       />
 
       <Notification
-        message={notificationMessage}
-        nik={foundNIK}
+        message="Komplain berhasil dikirim!"
+        nik=""
         isVisible={showNotification}
         onClose={() => setShowNotification(false)}
       />
