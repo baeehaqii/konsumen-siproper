@@ -1,6 +1,7 @@
 // Seed LACAK di Supabase (tabel lacak_konsumen, diisi scripts/seed-lacak.py).
 // Server-only: pakai secret key, tabel RLS tanpa policy jadi tidak bisa dibaca dari browser.
-// ponytail: fetch ke REST API, tanpa @supabase/supabase-js untuk 2 query select
+import { supabaseRest } from "@/lib/supabase"
+
 type Nullable<T> = { [K in keyof T]: T[K] | null }
 
 export interface LacakSeed {
@@ -17,13 +18,8 @@ export interface LacakSeed {
 }
 
 async function findOne(filter: string): Promise<LacakSeed | null> {
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) return null // seed belum dikonfigurasi → lanjut ke backend Siproper
-  const res = await fetch(`${url}/rest/v1/lacak_konsumen?select=data&limit=1&${filter}`, {
-    headers: { apikey: key, Authorization: `Bearer ${key}` },
-    cache: "no-store",
-  })
+  const res = await supabaseRest(`lacak_konsumen?select=data&limit=1&${filter}`)
+  if (!res) return null // seed belum dikonfigurasi → lanjut ke backend Siproper
   if (!res.ok) throw new Error(`Supabase lacak_konsumen: ${res.status}`)
   const rows: { data: LacakSeed }[] = await res.json()
   return rows[0]?.data ?? null

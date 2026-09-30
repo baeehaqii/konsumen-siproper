@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server"
 import { findSeedByNik } from "@/lib/lacak-seed"
 import { konsumenToken } from "@/lib/konsumen-token"
+import { supabaseRest } from "@/lib/supabase"
 
 let cachedToken: string | null = null
 let tokenExpiry: number = 0
@@ -76,35 +77,34 @@ function found(data: { id?: string } & Record<string, unknown>) {
   return NextResponse.json({ status: "success", data, token: data?.id ? konsumenToken(data.id) : undefined })
 }
 
-// Rate limit lookup NIK: max 10 percobaan per IP per hari
-// ponytail: Map in-memory per instance, reset saat server restart; pindah ke Redis/Upstash kalau deploy multi-instance/serverless
+// Rate limit lookup NIK: max 10 percobaan per IP per hari, dihitung atomik di Supabase
+// (fungsi take_lookup_slot) supaya berlaku lintas instance serverless.
+// ponytail: baris IP kedaluwarsa tidak dibersihkan; tambah pg_cron delete kalau tabel membengkak
 const LOOKUP_LIMIT = 10
-const DAY_MS = 24 * 60 * 60 * 1000
-const lookupHits = new Map<string, { count: number; resetAt: number }>()
 
-function takeLookupSlot(ip: string) {
-  const now = Date.now()
-  const hit = lookupHits.get(ip)
-  if (!hit || now >= hit.resetAt) {
-    if (lookupHits.size > 10_000) for (const [k, v] of lookupHits) if (now >= v.resetAt) lookupHits.delete(k)
-    lookupHits.set(ip, { count: 1, resetAt: now + DAY_MS })
-    return { ok: true, resetAt: now + DAY_MS }
-  }
-  hit.count++
-  return { ok: hit.count <= LOOKUP_LIMIT, resetAt: hit.resetAt }
+async function takeLookupSlot(ip: string): Promise<{ ok: boolean; reset_at: string }> {
+  const res = await supabaseRest("rpc/take_lookup_slot", {
+    method: "POST",
+    body: JSON.stringify({ p_ip: ip, p_limit: LOOKUP_LIMIT }),
+  })
+  // fail closed: tanpa rate limit, lookup NIK bisa di-brute force
+  if (!res) throw new Error("SUPABASE_URL / SUPABASE_SECRET_KEY belum di-set (rate limit)")
+  if (!res.ok) throw new Error(`Supabase take_lookup_slot: ${res.status}`)
+  const [slot] = await res.json()
+  return slot
 }
 
 export async function POST(request: Request) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() || request.headers.get("x-real-ip") || "unknown"
-  const slot = takeLookupSlot(ip)
-  if (!slot.ok) {
-    return NextResponse.json(
-      { status: "error", message: "Terlalu banyak percobaan. Coba lagi besok." },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((slot.resetAt - Date.now()) / 1000)) } }
-    )
-  }
-
   try {
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() || request.headers.get("x-real-ip") || "unknown"
+    const slot = await takeLookupSlot(ip)
+    if (!slot.ok) {
+      return NextResponse.json(
+        { status: "error", message: "Terlalu banyak percobaan. Coba lagi besok." },
+        { status: 429, headers: { "Retry-After": String(Math.max(0, Math.ceil((Date.parse(slot.reset_at) - Date.now()) / 1000))) } }
+      )
+    }
+
     const body = await request.json()
     const nik: string = (body.nik ?? "").replace(/\D/g, "")
 
