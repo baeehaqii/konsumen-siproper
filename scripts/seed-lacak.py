@@ -1,13 +1,19 @@
-"""Seeder: sheet LACAK (LACAK KONSUMEN.xlsx) -> data/lacak-konsumen.json
+"""Seeder: sheet LACAK (LACAK KONSUMEN.xlsx) -> Supabase tabel lacak_konsumen (+ salinan data/lacak-konsumen.json)
 
 Ambil seksi DATA PEMESAN + PRABOOKING, TEKNIK, LEGAL, KEUANGAN.
 Likuiditas belum diambil.
 
     python3 scripts/seed-lacak.py [path.xlsx]
+
+Butuh SUPABASE_URL + SUPABASE_SECRET_KEY (atau SUPABASE_SERVICE_ROLE_KEY) di env atau .env.local.
+Excel = sumber kebenaran: baris yang hilang dari Excel ikut dihapus dari tabel.
 """
 # ponytail: python + openpyxl (sudah ada di mesin) supaya tidak menambah dependency xlsx ke app
 import json
+import os
 import sys
+import urllib.parse
+import urllib.request
 from datetime import date, datetime
 from pathlib import Path
 
@@ -94,6 +100,41 @@ def main():
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(json.dumps(records, ensure_ascii=False, indent=2) + "\n")
     print(f"{len(records)} konsumen -> {OUT.relative_to(ROOT)}")
+    if records:  # jangan kosongkan tabel kalau Excel gagal terbaca
+        sync_supabase(records)
+
+
+def env(name):
+    if name in os.environ:
+        return os.environ[name]
+    local = ROOT / ".env.local"
+    for line in local.read_text().splitlines() if local.exists() else []:
+        k, _, v = line.partition("=")
+        if k.strip() == name:
+            return v.strip().strip('"')
+    return None
+
+
+def sync_supabase(records):
+    url = env("SUPABASE_URL")
+    key = env("SUPABASE_SECRET_KEY") or env("SUPABASE_SERVICE_ROLE_KEY")
+    if not url or not key:
+        sys.exit("SUPABASE_URL / SUPABASE_SECRET_KEY belum di-set di .env.local, data belum masuk Supabase")
+    headers = {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+
+    def call(method, query, body=None, prefer="return=minimal"):
+        req = urllib.request.Request(
+            f"{url}/rest/v1/lacak_konsumen?{query}", method=method,
+            data=json.dumps(body, ensure_ascii=False).encode() if body is not None else None,
+            headers={**headers, "Prefer": prefer},
+        )
+        urllib.request.urlopen(req).close()
+
+    rows = [{"id": r["id"], "nik": r["nik"], "data": r} for r in records]
+    call("POST", "on_conflict=id", rows, "resolution=merge-duplicates,return=minimal")
+    keep = ",".join('"' + r["id"].replace('"', '\\"') + '"' for r in records)
+    call("DELETE", "id=not.in." + urllib.parse.quote(f"({keep})"))
+    print(f"{len(rows)} konsumen -> Supabase lacak_konsumen")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 "use server"
 
 import { NextResponse } from "next/server"
-import { LACAK, type LacakSeed } from "@/lib/lacak-seed"
+import { findSeedById, type LacakSeed } from "@/lib/lacak-seed"
 import { isValidKonsumenToken } from "@/lib/konsumen-token"
 
 let cachedToken: string | null = null
@@ -123,8 +123,6 @@ const DUMMY_BY_ID: Record<string, object> = {
 }
 
 // ─── Seed dari sheet LACAK (scripts/seed-lacak.py) → bentuk KonsumenData ──────
-// URL tidak bisa memuat "//" (mis. 018/023//A-5/Booking), jadi key dinormalkan
-const SEED_BY_ID = new Map(LACAK.map((r) => [r.id.replace(/\/+/g, "/"), r]))
 
 const TAHAP_PAGE = ["pondasi", "atap", "fasad", "hitaman", "bast"] as const
 const TAHAP_NAMA = { pondasi: "Pondasi", atap: "Atap", fasad: "Fasad", hitaman: "Hitaman", bast: "BAST" }
@@ -196,7 +194,7 @@ export async function GET(
       console.log("✅ Returning dummy data for ID:", id)
       return NextResponse.json({ status: "success", data: DUMMY_BY_ID[id] })
     }
-    const seed = SEED_BY_ID.get(id)
+    const seed = await findSeedById(id)
     if (seed) return NextResponse.json({ status: "success", data: fromLacak(seed) })
 
     const baseUrl = process.env.SIPROPER_API_URL

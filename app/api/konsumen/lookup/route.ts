@@ -1,7 +1,7 @@
 "use server"
 
 import { NextResponse } from "next/server"
-import { LACAK } from "@/lib/lacak-seed"
+import { findSeedByNik } from "@/lib/lacak-seed"
 import { konsumenToken } from "@/lib/konsumen-token"
 
 let cachedToken: string | null = null
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
       console.log("✅ Returning dummy data")
       return found(DUMMY_BY_NIK[nik] as { id: string })
     }
-    const seed = LACAK.find((r) => r.nik === nik)
+    const seed = await findSeedByNik(nik)
     if (seed) return found({ id: seed.id, nama: seed.pemesanan.nama })
 
     // Hit real backend
