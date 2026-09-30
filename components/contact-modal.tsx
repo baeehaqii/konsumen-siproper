@@ -104,10 +104,7 @@ export default function ContactModal({
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               className="w-full rounded-xl border px-4 py-3 text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:ring-2"
-              style={{
-                borderColor: "#c5c6ce",
-                focusRingColor: primary,
-              }}
+              style={{ borderColor: "#c5c6ce", "--tw-ring-color": primary } as React.CSSProperties}
             />
           </div>
 

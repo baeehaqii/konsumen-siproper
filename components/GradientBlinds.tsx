@@ -333,6 +333,9 @@ void main() {
       callIfFn(geometryRef.current, "remove")
       callIfFn(meshRef.current as unknown as { remove?: () => void }, "remove")
       callIfFn(rendererRef.current as unknown as { destroy?: () => void }, "destroy")
+      // free the WebGL context; Chrome caps live contexts (~16) and HMR/StrictMode leaks one per remount
+      gl.getExtension("WEBGL_lose_context")?.loseContext()
+      canvas.remove()
       programRef.current = null
       geometryRef.current = null
       meshRef.current = null

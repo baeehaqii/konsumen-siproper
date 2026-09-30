@@ -43,7 +43,6 @@ export default function Navbar() {
         } py-2`}
         style={{
           willChange: "transform",
-          transform: "translateZ(0)",
           backfaceVisibility: "hidden",
           perspective: "1000px",
           background: isScrolled ? "rgba(15, 15, 15, 0.8)" : "transparent",
@@ -60,7 +59,7 @@ export default function Navbar() {
           rel="noopener noreferrer"
         >
           <img
-            src="https://res.cloudinary.com/dx8w9qwl6/image/upload/v1767072165/logooo_kdnfbc.png"
+            src="/logo.png"
             alt="Logo"
             className="size-12 rounded-full"
           />
@@ -105,7 +104,7 @@ export default function Navbar() {
       >
         <a className="flex items-center justify-center gap-2" href="/">
           <img
-            src="https://res.cloudinary.com/dx8w9qwl6/image/upload/v1767072165/logooo_kdnfbc.png"
+            src="/logo.png"
             alt="Logo"
             className="size-10 rounded-full"
           />

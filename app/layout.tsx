@@ -13,19 +13,19 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "https://res.cloudinary.com/dx8w9qwl6/image/upload/v1767072165/logooo_kdnfbc.png",
+        url: "/logo.png",
         media: "(prefers-color-scheme: light)",
       },
       {
-        url: "https://res.cloudinary.com/dx8w9qwl6/image/upload/v1767072165/logooo_kdnfbc.png",
+        url: "/logo.png",
         media: "(prefers-color-scheme: dark)",
       },
       {
-        url: "https://res.cloudinary.com/dx8w9qwl6/image/upload/v1767072165/logooo_kdnfbc.png",
-        type: "image/svg+xml",
+        url: "/logo.png",
+        type: "image/png",
       },
     ],
-    apple: "https://res.cloudinary.com/dx8w9qwl6/image/upload/v1767072165/logooo_kdnfbc.png",
+    apple: "/logo.png",
   },
     generator: 'v0.app'
 }

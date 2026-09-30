@@ -53,7 +53,7 @@ const DUMMY_BY_NIK: Record<string, object> = {
     skema_pembiayaan: "KPR BTN",
     total_harga: 650000000,
     nama_agent: "Rindha Puspita",
-    jabatan_agent: "Senior Property Advisor",
+    jabatan_agent: "Sales Officer Sapphire Griya",
     no_hp_agent: "082198765432",
     milestones: [
       { nama: "Booking & Reservasi", status: "completed", tanggal: "Feb 2024" },
