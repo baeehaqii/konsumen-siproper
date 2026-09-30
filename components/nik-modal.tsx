@@ -42,7 +42,7 @@ export default function NIKModal({ isOpen, onClose }: NIKModalProps) {
       }
 
       const id = data.data?.id
-      if (!id) {
+      if (!id || !data.token) {
         setError("Data konsumen tidak lengkap, hubungi tim kami")
         return
       }
@@ -50,7 +50,8 @@ export default function NIKModal({ isOpen, onClose }: NIKModalProps) {
       // NIK tidak pernah masuk URL — hanya consumer ID
       onClose()
       setNik("")
-      router.push(`/konsumen/${id}`)
+      // ID UNIT memuat "/" → dipakai apa adanya sebagai path; "//" dirapatkan karena URL menormalkannya
+      router.push(`/konsumen/${id.replace(/\/+/g, "/")}/${data.token}`)
     } catch {
       setError("Gagal menghubungi server. Periksa koneksi Anda.")
     } finally {
@@ -98,7 +99,7 @@ export default function NIKModal({ isOpen, onClose }: NIKModalProps) {
               }}
               maxLength={16}
               disabled={isLoading}
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 disabled:opacity-60 tracking-widest font-mono text-sm"
+              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 disabled:opacity-60 tabular-nums text-sm"
             />
             <p className="mt-1 text-xs text-gray-400">
               {nik.replace(/\D/g, "").length}/16 digit

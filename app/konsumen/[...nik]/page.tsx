@@ -21,7 +21,6 @@ import {
   User,
   CalendarDays,
   Building2,
-  BadgeCheck,
   Download,
   Hammer,
   HardHat,
@@ -124,12 +123,14 @@ const CORAL = "#f07a5a"
 
 const PAGE_BG =
   "radial-gradient(ellipse 80% 60% at 60% 35%, #14505c 0%, #0c2a33 40%, #07151c 75%, #050e13 100%)"
+// longhand only: mixing `background` shorthand with backgroundAttachment makes React warn on rerender
+const PAGE_STYLE = { backgroundImage: PAGE_BG, backgroundAttachment: "fixed" } as const
 
 const TABS = [
   { id: "overview", label: "Overview", icon: Home },
   { id: "pembayaran", label: "Pembayaran", icon: CreditCard },
   { id: "pembangunan", label: "Pembangunan", icon: Building2 },
-  { id: "dokumen", label: "Dokumen", icon: FileText },
+  // { id: "dokumen", label: "Dokumen", icon: FileText },
   { id: "legalitas", label: "Legalitas", icon: Scale },
 ]
 
@@ -196,13 +197,6 @@ const TAHAP_ICONS: Record<string, React.ElementType> = {
   bast: ClipboardCheck,
 }
 
-// Hotspot positions on the isometric house image (percent of the square image)
-const HOTSPOTS: Record<string, { top: string; left: string }> = {
-  atap: { top: "13%", left: "40%" },
-  fasad: { top: "36%", left: "66%" },
-  pondasi: { top: "62%", left: "4%" },
-  hitaman: { top: "58%", left: "44%" },
-}
 
 const STATUS_STYLE = {
   completed: { label: "Selesai", color: GREEN, icon: CheckCircle2 },
@@ -387,14 +381,6 @@ function ProfilePanel({
         </div>
       </div>
 
-      {data?.status_konsumen && (
-        <div className="mt-3 flex items-center gap-1.5 text-xs font-medium" style={{ color: GREEN }}>
-          <ShieldCheck className="h-3.5 w-3.5" />
-          {data.status_konsumen}
-          {data.bergabung_sejak ? ` · Sejak ${data.bergabung_sejak}` : ""}
-        </div>
-      )}
-
       <div className="mt-5 grid grid-cols-2 gap-2.5">
         {tiles.map((t) => (
           <div key={t.label} className={`${TILE} px-4 py-3.5`}>
@@ -475,9 +461,50 @@ function ProfilePanel({
 
 // ─── Overview: hero + bottom cards ────────────────────────────────────────────
 
+// <model-viewer> is a web component; register it client-side only
+declare module "react" {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace JSX {
+    interface IntrinsicElements {
+      "model-viewer": React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & Record<string, unknown>
+    }
+  }
+}
+
+function HotspotChip({ tahap: t, className = "", ...rest }: { tahap: ProgresTahap; className?: string } & Record<string, unknown>) {
+  const s = STATUS_STYLE[t.status]
+  return (
+    <div
+      className={`flex items-center gap-2 whitespace-nowrap rounded-full border border-white/15 bg-[#07151c]/70 py-1.5 pl-2 pr-3 text-xs font-medium text-white shadow-lg backdrop-blur-md ${className}`}
+      {...rest}
+    >
+      <span className="relative flex h-2.5 w-2.5">
+        {t.status === "in_progress" && (
+          <span className="absolute inline-flex h-full w-full rounded-full opacity-60 motion-safe:animate-ping" style={{ background: s.color }} />
+        )}
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
+      </span>
+      {t.nama}
+      <span className="tabular-nums text-white/70">{t.persen}%</span>
+    </div>
+  )
+}
+
 function HouseHero({ data }: { data: KonsumenData | null }) {
   const tahap = data?.progres_tahap ?? DEFAULT_PROGRES_TAHAP
   const unitLabel = [data?.nama_blok, data?.nomor_unit].filter(Boolean).join(" · ")
+  // current stage = first one still running, else first not finished
+  const current = tahap.find((t) => t.status === "in_progress") ?? tahap.find((t) => t.status !== "completed")
+  // pondasi → foundation model; atap/fasad/hitaman/BAST/selesai → finished house model
+  // ponytail: one house model for every post-pondasi stage, add per-stage GLBs when they exist
+  const model =
+    current?.id === "pondasi"
+      ? { src: "/isometric-house/pondasi-3d.glb", poster: "/isometric-house/pondasi.webp", label: "pondasi", tahap: current, orbit: "45deg 60deg auto", target: "auto auto auto", fov: "auto" }
+      : { src: "/isometric-house/rumah-bast-3d.glb", poster: "/isometric-house/rumah-bast.webp", label: "rumah", tahap: current ?? tahap[tahap.length - 1], orbit: "45deg 65deg 145%", target: "0m 2.5m 0m", fov: "42deg" }
+
+  useEffect(() => {
+    import("@google/model-viewer")
+  }, [])
 
   return (
     <div className="relative w-full lg:static">
@@ -494,34 +521,34 @@ function HouseHero({ data }: { data: KonsumenData | null }) {
           className="absolute inset-[4%] rounded-full"
           style={{ background: "radial-gradient(circle closest-side, rgb(110 190 210 / 0.4) 0%, rgb(110 190 210 / 0.15) 55%, transparent 100%)" }}
         />
-        <img
-          src="/isometric-house/house-v3.webp"
-          alt={`Ilustrasi 3D unit ${unitLabel || "rumah"}`}
-          width={1600}
-          height={1600}
-          className="relative h-full w-full object-contain"
-        />
-        {tahap
-          .filter((t) => HOTSPOTS[t.id])
-          .map((t) => {
-            const s = STATUS_STYLE[t.status]
-            return (
-              <div
-                key={t.id}
-                className="absolute flex items-center gap-2 rounded-full border border-white/15 bg-[#07151c]/70 py-1.5 pl-2 pr-3 text-xs font-medium text-white shadow-lg backdrop-blur-md"
-                style={HOTSPOTS[t.id]}
-              >
-                <span className="relative flex h-2.5 w-2.5">
-                  {t.status === "in_progress" && (
-                    <span className="absolute inline-flex h-full w-full rounded-full opacity-60 motion-safe:animate-ping" style={{ background: s.color }} />
-                  )}
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
-                </span>
-                {t.nama}
-                <span className="tabular-nums text-white/70">{t.persen}%</span>
-              </div>
-            )
-          })}
+        <model-viewer
+          key={model.src}
+          src={model.src}
+          poster={model.poster}
+          alt={`Model 3D ${model.label} unit ${unitLabel || "rumah"}`}
+          camera-controls=""
+          auto-rotate=""
+          auto-rotate-delay="1500"
+          rotation-per-second="12deg"
+          disable-zoom=""
+          disable-pan=""
+          interaction-prompt="none"
+          camera-orbit={model.orbit}
+          camera-target={model.target}
+          field-of-view={model.fov}
+          max-field-of-view="60deg"
+          min-camera-orbit="auto 20deg auto"
+          max-camera-orbit="auto 85deg 150%"
+          shadow-intensity="0.9"
+          environment-image="neutral"
+          exposure="0.65"
+          tone-mapping="aces"
+          touch-action="pan-y"
+          className="absolute inset-0 h-full w-full"
+          style={{ background: "transparent", "--poster-color": "transparent" } as React.CSSProperties}
+        >
+          <HotspotChip tahap={model.tahap} slot="hotspot-tahap" data-position="0 0.2 0" />
+        </model-viewer>
       </div>
     </div>
   )
@@ -1108,9 +1135,12 @@ function TabPembangunan({ data, onContact }: { data: KonsumenData | null; onCont
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function KonsumenDetailPage({ params }: { params: Promise<{ nik: string }> }) {
+export default function KonsumenDetailPage({ params }: { params: Promise<{ nik: string[] }> }) {
   const router = useRouter()
-  const { nik } = use(params)
+  // catch-all: /konsumen/<id...>/<token>; ID UNIT seed memuat "/" (mis. 018/023/1/B-3/Booking)
+  const segments = use(params).nik.map(decodeURIComponent)
+  const path = segments.join("/")
+  const id = segments.slice(0, -1).join("/")
 
   const [data, setData] = useState<KonsumenData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -1120,11 +1150,11 @@ export default function KonsumenDetailPage({ params }: { params: Promise<{ nik: 
 
   useEffect(() => {
     fetchKonsumen()
-  }, [nik])
+  }, [path])
 
   const fetchKonsumen = async () => {
     try {
-      const res = await fetch(`/api/konsumen/${nik}`)
+      const res = await fetch(`/api/konsumen/${path}`)
       const result = await res.json()
 
       if (result.status === "error") {
@@ -1145,7 +1175,7 @@ export default function KonsumenDetailPage({ params }: { params: Promise<{ nik: 
   // ── Render: Error ──
   if (!isLoading && error) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4" style={{ background: PAGE_BG }}>
+      <div className="flex min-h-screen items-center justify-center px-4" style={PAGE_STYLE}>
         <div className={`${GLASS} max-w-sm p-8 text-center`}>
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full" style={{ background: `${CORAL}24` }}>
             <ShieldCheck className="h-8 w-8" style={{ color: CORAL }} />
@@ -1168,7 +1198,7 @@ export default function KonsumenDetailPage({ params }: { params: Promise<{ nik: 
   const activeTabInfo = TABS.find((t) => t.id === activeTab)
 
   return (
-    <div className="min-h-screen text-white" style={{ background: PAGE_BG, backgroundAttachment: "fixed" }}>
+    <div className="min-h-screen text-white" style={PAGE_STYLE}>
       {/* ── Top bar ── */}
       <header className="sticky top-0 z-30 border-b border-white/10 bg-[#07151c]/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:flex-nowrap">
@@ -1214,13 +1244,6 @@ export default function KonsumenDetailPage({ params }: { params: Promise<{ nik: 
                 {data.target_selesai}
               </span>
             )}
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold"
-              style={{ background: `${GREEN}1f`, color: GREEN }}
-            >
-              <BadgeCheck className="h-4 w-4" />
-              <span className="hidden sm:inline">Terverifikasi</span>
-            </span>
           </div>
         </div>
       </header>
@@ -1246,8 +1269,9 @@ export default function KonsumenDetailPage({ params }: { params: Promise<{ nik: 
         ) : (
           <>
             <div className="grid gap-4 lg:grid-cols-12">
-              <div className="lg:col-span-4 xl:col-span-3">
-                <ProfilePanel data={data} id={nik} onContact={openContact} />
+              {/* bottom-align so the panel ends level with the 3 cards */}
+              <div className="lg:col-span-4 lg:flex lg:flex-col lg:justify-end xl:col-span-3">
+                <ProfilePanel data={data} id={String(data?.id ?? id)} onContact={openContact} />
               </div>
               <section className="relative order-first flex flex-col lg:order-none lg:col-span-8 xl:col-span-9">
                 <div className="lg:flex lg:flex-1 lg:items-center">
