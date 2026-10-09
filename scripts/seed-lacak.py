@@ -25,7 +25,13 @@ SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "data" / "LACAK KONSUME
 OUT = ROOT / "data" / "lacak-konsumen.json"
 FIRST_ROW = 14  # baris 11-13 = header bertingkat
 # ponytail: Excel tidak punya kolom NIK; NIK dummy per blok untuk uji lookup, hapus saat NIK asli tersedia
-NIK_DUMMY = {"B-3": "3329120806900001"}
+NIK_DUMMY = {
+    "A-5": "3329121012920002",   # rumah selesai, ID UNIT pakai "//"
+    "B-3": "3329120806900001",   # fasad 52%
+    "B-7": "3329122503880003",   # BAST 97%
+    "C-10": "3329121707950004",  # hitaman 82%
+    "C-11": "3329120402930005",  # belum mulai bangun
+}
 
 PEMESANAN = {
     "no": "C", "id_unit": "D", "status_unit": "E", "nama": "F", "jenis_unit": "G", "blok": "H",

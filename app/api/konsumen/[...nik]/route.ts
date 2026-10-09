@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server"
 import { findSeedById, type LacakSeed } from "@/lib/lacak-seed"
 import { isValidKonsumenToken } from "@/lib/konsumen-token"
+import { findPembangunan } from "@/lib/pra-pembangunan"
 
 let cachedToken: string | null = null
 let tokenExpiry: number = 0
@@ -195,7 +196,10 @@ export async function GET(
       return NextResponse.json({ status: "success", data: DUMMY_BY_ID[id] })
     }
     const seed = await findSeedById(id)
-    if (seed) return NextResponse.json({ status: "success", data: fromLacak(seed) })
+    if (seed) {
+      const pembangunan = seed.nik ? await findPembangunan(seed.nik, id, seed.pemesanan.blok) : null
+      return NextResponse.json({ status: "success", data: { ...fromLacak(seed), ...pembangunan } })
+    }
 
     const baseUrl = process.env.SIPROPER_API_URL
     const token = await getAccessToken()
@@ -232,7 +236,9 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(data)
+    const nik = data?.data?.nik
+    const pembangunan = nik ? await findPembangunan(nik, id, data.data.nomor_unit) : null
+    return NextResponse.json(pembangunan ? { ...data, data: { ...data.data, ...pembangunan } } : data)
   } catch (error) {
     console.error("❌ Error fetching konsumen:", error)
     return NextResponse.json(
