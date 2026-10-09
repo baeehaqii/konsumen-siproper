@@ -1,43 +1,20 @@
-// Progres pembangunan langsung dari Siproper: GET /api/pra-pembangunan/nik/<nik>
-// Server-only: login pakai SIPROPER_EMAIL/PASSWORD ke host PRA_PEMBANGUNAN_API_URL.
-
-const BASE = process.env.PRA_PEMBANGUNAN_API_URL || "https://sys2.siproper.com"
+// Progres pembangunan dari Siproper sys2: GET /api/pra-pembangunan/nik/<nik>
+import { siproperGet } from "@/lib/siproper"
 
 interface Termin { nama_termin: string; sla: string | null; realisasi: string | null }
 export interface PraPembangunan {
   id_unit_cif: string
+  proyek: string | null
   blok_rumah: string
+  nama_konsumen: string | null
   clustering: string | null
   progres_lapangan: number | null
   termin: Termin[]
 }
 
-let token: string | null = null
-let expiry = 0
-
-async function getToken(fresh = false) {
-  if (!fresh && token && Date.now() < expiry) return token
-  const res = await fetch(`${BASE}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ email: process.env.SIPROPER_EMAIL, password: process.env.SIPROPER_PASSWORD }),
-  })
-  const body = await res.json()
-  if (body.status !== "success") throw new Error(`Login pra-pembangunan: ${body.message ?? res.status}`)
-  token = body.data.access_token as string
-  expiry = Date.now() + (body.data.expires_in - 60) * 1000
-  return token
-}
-
-async function fetchByNik(nik: string): Promise<PraPembangunan[]> {
-  const get = async (t: string) =>
-    fetch(`${BASE}/api/pra-pembangunan/nik/${encodeURIComponent(nik)}`, {
-      headers: { Accept: "application/json", Authorization: `Bearer ${t}` },
-      cache: "no-store",
-    })
-  let res = await get(await getToken())
-  if (res.status === 401) res = await get(await getToken(true))
-  if (res.status === 404) return []
+export async function fetchPraPembangunan(nik: string): Promise<PraPembangunan[]> {
+  const res = await siproperGet("sys2", `pra-pembangunan/nik/${encodeURIComponent(nik)}`)
+  if (res.status === 404) return [] // NIK tidak ada (nginx 404, bukan JSON)
   const body = await res.json()
   if (!res.ok || !body.success) throw new Error(`pra-pembangunan: ${body.message ?? res.status}`)
   return body.data ?? []
@@ -55,7 +32,7 @@ const tgl = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : undefined
 const norm = (s: string) => s.replace(/\/+/g, "/")
 
-// Field KonsumenData bagian pembangunan; null kalau unit tidak ada di API
+// Field KonsumenData bagian pembangunan
 export function toPembangunan(u: PraPembangunan) {
   const byNama = new Map(u.termin.map((t) => [t.nama_termin.toLowerCase(), t]))
   const progres = Math.round(u.progres_lapangan ?? 0)
@@ -81,17 +58,16 @@ export function toPembangunan(u: PraPembangunan) {
   }
 }
 
-// Cari unit milik konsumen (by id_unit_cif, lalu blok); error API tidak memblokir halaman
-export async function findPembangunan(nik: string, id: string, blok?: string) {
+// Unit sys2 untuk konsumen ini by id_unit_cif; fallback blok / satu-satunya unit hanya kalau
+// blok diberikan (NIK dari seed, pasti milik id ini). Error API tidak memblokir halaman.
+export async function findUnit(nik: string, id: string, blok?: string) {
   try {
-    const units = await fetchByNik(nik)
-    const u =
-      units.find((x) => norm(x.id_unit_cif) === norm(id)) ??
-      units.find((x) => blok && x.blok_rumah === blok) ??
-      (units.length === 1 ? units[0] : undefined)
-    return u ? toPembangunan(u) : null
+    const units = await fetchPraPembangunan(nik)
+    const exact = units.find((x) => norm(x.id_unit_cif) === norm(id))
+    if (exact || !blok) return exact
+    return units.find((x) => x.blok_rumah === blok) ?? (units.length === 1 ? units[0] : undefined)
   } catch (e) {
     console.error("❌ pra-pembangunan:", e)
-    return null
+    return undefined
   }
 }

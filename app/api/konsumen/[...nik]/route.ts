@@ -2,38 +2,9 @@
 
 import { NextResponse } from "next/server"
 import { findSeedById, type LacakSeed } from "@/lib/lacak-seed"
-import { isValidKonsumenToken } from "@/lib/konsumen-token"
-import { findPembangunan } from "@/lib/pra-pembangunan"
-
-let cachedToken: string | null = null
-let tokenExpiry: number = 0
-
-async function getAccessToken(): Promise<string> {
-  if (cachedToken && Date.now() < tokenExpiry) return cachedToken
-
-  const baseUrl = process.env.SIPROPER_API_URL
-  const email = process.env.SIPROPER_EMAIL
-  const password = process.env.SIPROPER_PASSWORD
-
-  if (!baseUrl || !email || !password) {
-    throw new Error("Missing API credentials in environment variables")
-  }
-
-  const response = await fetch(`${baseUrl}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ email, password }),
-  })
-
-  if (!response.ok) throw new Error(`Login failed: ${response.statusText}`)
-
-  const data = await response.json()
-  if (data.status !== "success") throw new Error(data.message || "Login failed")
-
-  cachedToken = data.data.access_token
-  tokenExpiry = Date.now() + (data.data.expires_in - 60) * 1000
-  return cachedToken as string
-}
+import { cookies } from "next/headers"
+import { isValidKonsumenToken, NIK_COOKIE, verifyNik } from "@/lib/konsumen-token"
+import { findUnit, toPembangunan } from "@/lib/pra-pembangunan"
 
 // ─── Dummy data keyed by consumer ID (bukan NIK) ──────────────────────────────
 const DUMMY_BY_ID: Record<string, object> = {
@@ -197,48 +168,27 @@ export async function GET(
     }
     const seed = await findSeedById(id)
     if (seed) {
-      const pembangunan = seed.nik ? await findPembangunan(seed.nik, id, seed.pemesanan.blok) : null
-      return NextResponse.json({ status: "success", data: { ...fromLacak(seed), ...pembangunan } })
+      const unit = seed.nik ? await findUnit(seed.nik, id, seed.pemesanan.blok) : undefined
+      return NextResponse.json({ status: "success", data: { ...fromLacak(seed), ...(unit && toPembangunan(unit)) } })
     }
 
-    const baseUrl = process.env.SIPROPER_API_URL
-    const token = await getAccessToken()
-
-    let response = await fetch(`${baseUrl}/api/konsumen/${id}`, {
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
+    // unit hanya ada di sys2: NIK dari cookie yang diset saat lookup
+    const nik = verifyNik((await cookies()).get(NIK_COOKIE)?.value)
+    const unit = nik ? await findUnit(nik, id) : undefined
+    if (!unit) {
+      return NextResponse.json({ status: "error", message: "Konsumen tidak ditemukan" }, { status: 404 })
+    }
+    return NextResponse.json({
+      status: "success",
+      data: {
+        id,
+        nama: unit.nama_konsumen,
+        nama_proyek: unit.proyek,
+        nama_blok: `Blok ${unit.blok_rumah.split("-")[0]}`,
+        nomor_unit: unit.blok_rumah,
+        ...toPembangunan(unit),
       },
-      cache: "no-store",
     })
-
-    if (response.status === 401) {
-      cachedToken = null
-      tokenExpiry = 0
-      const newToken = await getAccessToken()
-      response = await fetch(`${baseUrl}/api/konsumen/${id}`, {
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: `Bearer ${newToken}`,
-        },
-        cache: "no-store",
-      })
-    }
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { status: "error", message: data.message || "Konsumen tidak ditemukan" },
-        { status: response.status }
-      )
-    }
-
-    const nik = data?.data?.nik
-    const pembangunan = nik ? await findPembangunan(nik, id, data.data.nomor_unit) : null
-    return NextResponse.json(pembangunan ? { ...data, data: { ...data.data, ...pembangunan } } : data)
   } catch (error) {
     console.error("❌ Error fetching konsumen:", error)
     return NextResponse.json(

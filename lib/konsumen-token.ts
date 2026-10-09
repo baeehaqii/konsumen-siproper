@@ -16,3 +16,12 @@ export function isValidKonsumenToken(id: string, token: string) {
   const b = Buffer.from(token)
   return a.length === b.length && timingSafeEqual(a, b)
 }
+
+// Cookie httpOnly "konsumen_nik" = <nik>.<hmac>, diset saat lookup NIK. Dipakai detail untuk
+// unit yang hanya ada di sys2 (API sys2 cuma bisa dicari by NIK); NIK tidak pernah masuk URL.
+export const NIK_COOKIE = "konsumen_nik"
+export const signNik = (nik: string) => `${nik}.${konsumenToken(`nik:${nik}`)}`
+export function verifyNik(value?: string) {
+  const [nik, sig] = (value ?? "").split(".")
+  return nik && sig && isValidKonsumenToken(`nik:${nik}`, sig) ? nik : null
+}
