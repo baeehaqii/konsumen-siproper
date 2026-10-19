@@ -27,13 +27,30 @@ async function login(sys: Sys, fresh: boolean) {
   return body.data.access_token as string
 }
 
-// GET <sys>/api/<path>, login ulang sekali kalau token ditolak
-export async function siproperGet(sys: Sys, path: string) {
+// GET (atau POST kalau ada body) <sys>/api/<path>, login ulang sekali kalau token ditolak
+export async function siproperGet(sys: Sys, path: string, body?: unknown) {
   const get = async (fresh: boolean) =>
     fetch(`${process.env[`SIPROPER_${sys.toUpperCase()}_URL`]}/api/${path}`, {
-      headers: { Accept: "application/json", Authorization: `Bearer ${await login(sys, fresh)}` },
+      method: body === undefined ? "GET" : "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${await login(sys, fresh)}`,
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
       cache: "no-store",
     })
   const res = await get(false)
   return res.status === 401 ? get(true) : res
+}
+
+// Teruskan respons Siproper apa adanya (status + JSON) ke client
+export async function siproperProxy(sys: Sys, path: string, body?: unknown) {
+  try {
+    const res = await siproperGet(sys, path, body)
+    const data = await res.json().catch(() => ({ status: "error", message: res.statusText }))
+    return Response.json(data, { status: res.status })
+  } catch (e) {
+    return Response.json({ status: "error", message: e instanceof Error ? e.message : "Unknown error" }, { status: 500 })
+  }
 }

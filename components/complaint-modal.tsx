@@ -155,14 +155,14 @@ export default function ComplaintModal({ isOpen, onClose, onSubmit }: ComplaintM
         },
         body: JSON.stringify({
           proyek_id: formData.proyek,
-          blok_id: formData.blok,
+          area_blok: formData.blok,
           nama_konsumen: formData.namaKonsumen,
-          no_whatsapp: formData.noWhatsApp,
+          no_wa: formData.noWhatsApp,
           tanggal_komplain: formData.tanggalKomplain,
-          tanggal_bast: formData.tanggalBAST,
-          deskripsi: formData.deskripsi,
+          tahun_bast: formData.tanggalBAST,
+          deskripsi_komplain: formData.deskripsi,
           jenis_komplain: formData.jenisKomplain,
-          cluster_komplain: formData.clusterKomplain,
+          cluster: formData.clusterKomplain,
         }),
       })
 
